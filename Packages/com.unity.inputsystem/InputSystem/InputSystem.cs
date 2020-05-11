@@ -2591,9 +2591,15 @@ namespace UnityEngine.InputSystem
         ///         }
         ///         else if (change == InputActionChange.BoundControlsChanged)
         ///         {
+        ///             // This is one way to deal with the fact that obj may be an InputAction
+        ///             // InputActionMap, or InputActionAsset and may be part of an InputActionAsset or not.
         ///             var action = obj as InputAction;
         ///             var actionMap = action?.actionMap ?? obj as InputActionMap;
         ///             var actionAsset = actionMap?.asset ?? obj as InputActionAsset;
+        ///
+        ///             // Note that if bound controls are changed on any map in an asset, there *will*
+        ///             // be a BoundControlsChanged notification for the entire asset.
+        ///
         ///             //...
         ///         }
         ///     };
@@ -2935,10 +2941,14 @@ namespace UnityEngine.InputSystem
             {
                 const string dialogText = "This project is using the new input system package but the native platform backends for the new input system are not enabled in the player settings. " +
                     "This means that no input from native devices will come through." +
-                    "\n\nDo you want to enable the backends? Doing so requires a restart of the editor.";
+                    "\n\nDo you want to enable the backends? Doing so will *RESTART* the editor and will *DISABLE* the old UnityEngine.Input APIs.";
 
                 if (EditorUtility.DisplayDialog("Warning", dialogText, "Yes", "No"))
+                {
                     EditorPlayerSettingHelpers.newSystemBackendsEnabled = true;
+                    EditorPlayerSettingHelpers.oldSystemBackendsEnabled = false;
+                    EditorHelpers.RestartEditorAndRecompileScripts();
+                }
             }
             s_SystemObject.newInputBackendsCheckedAsEnabled = true;
 
@@ -3073,7 +3083,7 @@ namespace UnityEngine.InputSystem
             Switch.SwitchSupportHID.Initialize();
             #endif
 
-            #if (UNITY_EDITOR || UNITY_STANDALONE || UNITY_ANDROID || UNITY_IOS || UNITY_WSA) && ENABLE_VR
+            #if (UNITY_EDITOR || UNITY_STANDALONE || UNITY_ANDROID || UNITY_IOS || UNITY_WSA) && UNITY_INPUT_SYSTEM_ENABLE_XR
             XR.XRSupport.Initialize();
             #endif
 
@@ -3249,6 +3259,7 @@ namespace UnityEngine.InputSystem
 
             s_Manager.InstallRuntime(s_Manager.m_Runtime);
             s_Manager.InstallGlobals();
+            s_Manager.ApplySettings();
 
             #if UNITY_EDITOR
             InputEditorUserSettings.s_Settings = state.userSettings;

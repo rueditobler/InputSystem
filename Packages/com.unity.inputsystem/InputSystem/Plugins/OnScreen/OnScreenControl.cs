@@ -6,6 +6,8 @@ using UnityEngine.InputSystem.Utilities;
 
 ////REVIEW: should we make this ExecuteInEditMode?
 
+////TODO: handle display strings for this in some form; shouldn't display generic gamepad binding strings, for example, for OSCs
+
 ////TODO: give more control over when an OSC creates a new devices; going simply by name of layout only is inflexible
 
 ////TODO: make this survive domain reloads
@@ -171,6 +173,7 @@ namespace UnityEngine.InputSystem.OnScreen
                 throw new ArgumentException(
                     $"The control path {controlPath} yields a control of type {m_Control.GetType().Name} which is not an InputControl with value type {typeof(TValue).Name}", nameof(value));
 
+            ////FIXME: this gives us a one-frame lag
             m_InputEventPtr.internalTime = InputRuntime.s_Instance.currentTime;
             control.WriteValueIntoEvent(value, m_InputEventPtr);
             InputSystem.QueueEvent(m_InputEventPtr);

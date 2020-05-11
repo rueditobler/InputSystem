@@ -739,6 +739,42 @@ partial class CoreTests
         Assert.That(receivedValue, Is.EqualTo(1).Within(0.00001));
     }
 
+    [Test]
+    [Category("Actions")]
+    public void Actions_CanReadValueFromAction_InCallback_AsButton()
+    {
+        InputSystem.settings.defaultButtonPressPoint = 0.5f;
+
+        var action = new InputAction(binding: "<Gamepad>/leftTrigger");
+        var gamepad = InputSystem.AddDevice<Gamepad>();
+
+        action.Enable();
+
+        bool? receivedValue = null;
+        action.performed +=
+            ctx =>
+        {
+            Assert.That(receivedValue, Is.Null);
+            receivedValue = ctx.ReadValueAsButton();
+        };
+
+        Set(gamepad.leftTrigger, 0.25f);
+
+        Assert.That(receivedValue, Is.False);
+
+        receivedValue = null;
+
+        Set(gamepad.leftTrigger, 0.75f);
+
+        Assert.That(receivedValue, Is.True);
+
+        receivedValue = null;
+
+        Set(gamepad.leftTrigger, 0.15f);
+
+        Assert.That(receivedValue, Is.False);
+    }
+
     // Some code needs to be able to just generically transfer values from A to B. For this, the
     // generic ReadValue<TValue>() API isn't sufficient.
     [Test]
@@ -2399,6 +2435,27 @@ partial class CoreTests
         Assert.That(action.controls, Has.Exactly(1).SameAs(gamepad.rightStick));
     }
 
+    // Case 1218544
+    [Test]
+    [Category("Actions")]
+    public void Actions_CanAddBindingsToActions_AfterActionHasBeenEnabled()
+    {
+        var gamepad = InputSystem.AddDevice<Gamepad>();
+        var action = new InputAction(name: "test", binding: "<Gamepad>/leftStick");
+        action.Enable();
+
+        Assert.That(action.controls, Is.EquivalentTo(new[] { gamepad.leftStick }));
+        Assert.That(action.bindings, Has.Count.EqualTo(1));
+        Assert.That(action.bindings[0].effectivePath, Is.EqualTo("<Gamepad>/leftStick"));
+
+        action.AddBinding("<Gamepad>/rightStick");
+
+        Assert.That(action.controls, Is.EquivalentTo(new[] { gamepad.leftStick, gamepad.rightStick }));
+        Assert.That(action.bindings, Has.Count.EqualTo(2));
+        Assert.That(action.bindings[0].path, Is.EqualTo("<Gamepad>/leftStick"));
+        Assert.That(action.bindings[0].path, Is.EqualTo("<Gamepad>/leftStick"));
+    }
+
     [Test]
     [Category("Actions")]
     public void Actions_BindingsHaveUniqueIDs()
@@ -2762,6 +2819,46 @@ partial class CoreTests
         Assert.That(receivedVector, Is.Not.Null);
         Assert.That(receivedVector.Value.x, Is.EqualTo(0.1234).Within(0.00001));
         Assert.That(receivedVector.Value.y, Is.EqualTo(0.5678).Within(0.00001));
+    }
+
+    // https://fogbugz.unity3d.com/f/cases/1207082/
+    [Test]
+    [Category("Actions")]
+    public void Actions_CanAddProcessorsToCompositeBindings()
+    {
+        var keyboard = InputSystem.AddDevice<Keyboard>();
+
+        var action = new InputAction();
+        action.AddCompositeBinding("2DVector", processors: "invertVector2(invertX=true,invertY=true)")
+            .With("Up", "<Keyboard>/w")
+            .With("Down", "<Keyboard>/s")
+            .With("Left", "<Keyboard>/a")
+            .With("Right", "<Keyboard>/d");
+
+        action.Enable();
+
+        // Left -> Right.
+        Press(keyboard.aKey);
+
+        Assert.That(action.ReadValue<Vector2>(), Is.EqualTo(new Vector2(1, 0)));
+
+        // Right -> Left.
+        Release(keyboard.aKey);
+        Press(keyboard.dKey);
+
+        Assert.That(action.ReadValue<Vector2>(), Is.EqualTo(new Vector2(-1, 0)));
+
+        // Up -> Down.
+        Release(keyboard.dKey);
+        Press(keyboard.wKey);
+
+        Assert.That(action.ReadValue<Vector2>(), Is.EqualTo(new Vector2(0, -1)));
+
+        // Down -> Up.
+        Release(keyboard.wKey);
+        Press(keyboard.sKey);
+
+        Assert.That(action.ReadValue<Vector2>(), Is.EqualTo(new Vector2(0, 1)));
     }
 
     [Test]
@@ -4805,7 +4902,7 @@ partial class CoreTests
 
         // Can suppress.
         Assert.That(action1.GetBindingDisplayString(InputBinding.DisplayStringOptions.DontIncludeInteractions),
-            Is.EqualTo("Hold " + GamepadState.ButtonSouthShortDisplayName));
+            Is.EqualTo(GamepadState.ButtonSouthShortDisplayName));
     }
 
     [Test]
